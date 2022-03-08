@@ -1,0 +1,58 @@
+```{r}
+library(gssr)
+library(tidyverse)
+# don't recommend getting single year -- not enough data
+# gss21 <- gss_get_yr(2021)
+# gss21["sexsex"]
+data(gss_all)
+
+```
+```{r}
+gss_clean <- gss_all |>
+  mutate(
+    id = paste0(year, '_', id),
+    sexnow = coalesce(sexnow, sexnow1),
+    sexbirth = coalesce(sexbirth, sexbirth1)
+    ) |>
+  select(-sexnow1, -sexbirth1)
+```
+
+
+```{r}
+# grab a subset of data, specifically
+# all responses from years in which all
+# required questions in {qns} are asked/
+# have answers.
+# Optionally, also filter to only entries
+# with answers to all questions.
+getSubsetWithAnswers <- function(qns, clean_na = FALSE) {
+  years_all_asked <- gss_clean |>
+    gss_which_years(qns) |>
+    na_if(FALSE) |>
+    drop_na() |>
+    pull(year)
+  
+  gss_clean |>
+    filter(year %in% years_all_asked) |>
+    select(year, id, all_of(qns)) |>
+    filter(across(qns, ~ !clean_na | !is.na(.)))
+}
+```
+
+```{r}
+# this dataset contains a whopping 1 intersex person,
+# and only 12 who identify their SEXNOW as 3 [transgender].
+# In fact, only 42 people identify their SEXBIRTH as different from SEXNOW.
+getSubsetWithAnswers(c("sexnow", "sexbirth"), clean_na = T) |>
+  ggplot(aes(x = as.factor(sexbirth), y = as.factor(sexnow))) +
+  geom_bin2d()
+```
+```{r}
+# Interesting...
+gss_clean |> 
+  filter(sexbirth != sexnow |
+         sexnow != sex |
+         sex != sexbirth) |> 
+  select(id, sexbirth, sexnow, sex)
+```
+
