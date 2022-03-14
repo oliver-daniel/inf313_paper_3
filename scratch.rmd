@@ -4,17 +4,28 @@ library(tidyverse)
 # don't recommend getting single year -- not enough data
 # gss21 <- gss_get_yr(2021)
 # gss21["sexsex"]
-data(gss_all)
+
 
 ```
+
+```{r}
+data(gss_all)
+```
+
 ```{r}
 gss_clean <- gss_all |>
   mutate(
     id = paste0(year, '_', id),
-    sexnow = coalesce(sexnow, sexnow1),
-    sexbirth = coalesce(sexbirth, sexbirth1)
+    sexnow = coalesce(sexnow, sexnow1) |> as_factor(),
+    sexbirth = coalesce(sexbirth, sexbirth1) |> as_factor(),
+    sexornt = as_factor(sexornt),
+    sexsex = as_factor(sexsex),
+    sexsex5 = as_factor(sexsex5)
     ) |>
-  select(-sexnow1, -sexbirth1)
+  select(id, sexnow, sexbirth, sexornt, sexsex, sexsex5)
+```
+```{r}
+
 ```
 
 
@@ -56,3 +67,31 @@ gss_clean |>
   select(id, sexbirth, sexnow, sex)
 ```
 
+```{r}
+gss_clean |>
+  filter(!if_any(c(sexsex, sexnow, sexornt), is.na)) |>
+  ggplot(aes(x = sexsex, fill=sexsex)) +
+  geom_histogram(stat="count") +
+  scale_fill_manual(values=c('blue', 'purple', 'red')) +
+  theme(axis.text.x = element_blank()) +
+  facet_grid(sexnow ~ sexornt,
+             scales = "free_y")
+```
+```{r}
+gss_clean |>
+  filter(!if_any(c(sexsex5, sexnow, sexornt), is.na)) |>
+  ggplot(aes(x = sexsex5, fill=sexsex5)) +
+  geom_histogram(stat="count") +
+  scale_fill_manual(values=c('blue', 'purple', 'red')) +
+  #geom_text(stat="count", aes(label=..count..), position = position_stack(vjust=.5), color="black") +
+  theme_bw() + 
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    panel.grid.major.x = element_blank()
+    ) +
+  facet_grid(sexornt ~ sexnow,
+             scales = "free_y",
+             labeller = label_wrap_gen(width = 16, multi_line = T)
+             )
+```
