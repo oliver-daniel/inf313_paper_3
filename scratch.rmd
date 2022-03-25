@@ -16,13 +16,10 @@ data(gss_all)
 gss_clean <- gss_all |>
   mutate(
     id = paste0(year, '_', id),
-    sexnow = coalesce(sexnow, sexnow1) |> as_factor(),
-    sexbirth = coalesce(sexbirth, sexbirth1) |> as_factor(),
-    sexornt = as_factor(sexornt),
-    sexsex = as_factor(sexsex),
-    sexsex5 = as_factor(sexsex5)
+    sexnow = coalesce(sexnow, sexnow1),
+    sexbirth = coalesce(sexbirth, sexbirth1),
     ) |>
-  select(id, sexnow, sexbirth, sexornt, sexsex, sexsex5)
+  select(id, year, sex, sexnow, sexbirth, sexornt, sexsex, sexsex5)
 ```
 ```{r}
 
@@ -37,13 +34,13 @@ gss_clean <- gss_all |>
 # Optionally, also filter to only entries
 # with answers to all questions.
 getSubsetWithAnswers <- function(qns, clean_na = FALSE) {
-  years_all_asked <- gss_clean |>
+  years_all_asked <- gss_all |>
     gss_which_years(qns) |>
     na_if(FALSE) |>
     drop_na() |>
     pull(year)
   
-  gss_clean |>
+  gss_all |>
     filter(year %in% years_all_asked) |>
     select(year, id, all_of(qns)) |>
     filter(across(qns, ~ !clean_na | !is.na(.)))
@@ -70,7 +67,7 @@ gss_clean |>
 ```{r}
 gss_clean |>
   filter(!if_any(c(sexsex, sexnow, sexornt), is.na)) |>
-  ggplot(aes(x = sexsex, fill=sexsex)) +
+  ggplot(aes(x = as_factor(sexsex), fill=as_factor(sexsex))) +
   geom_histogram(stat="count") +
   scale_fill_manual(values=c('blue', 'purple', 'red')) +
   theme(axis.text.x = element_blank()) +
@@ -80,7 +77,7 @@ gss_clean |>
 ```{r}
 gss_clean |>
   filter(!if_any(c(sexsex5, sexnow, sexornt), is.na)) |>
-  ggplot(aes(x = sexsex5, fill=sexsex5)) +
+  ggplot(aes(x = as_factor(sexsex5), fill=as_factor(sexsex5))) +
   geom_histogram(stat="count") +
   scale_fill_manual(values=c('blue', 'purple', 'red')) +
   #geom_text(stat="count", aes(label=..count..), position = position_stack(vjust=.5), color="black") +
@@ -94,4 +91,67 @@ gss_clean |>
              scales = "free_y",
              labeller = label_wrap_gen(width = 16, multi_line = T)
              )
+```
+
+```{r}
+# Well, let's see just /how/ flawed the data is.
+
+subsetWith <- function(..) {
+  gss_clean |>
+    filter(!if_any(.., is.na))
+}
+```
+```{r}
+gender_counts <- subsetWith(c('sex', 'sexbirth', 'sexnow')) |>
+  mutate(
+    sex_changed = sexbirth != sexnow,
+    sex_mismatch = sexbirth == sexnow & sexnow != sex,
+    sex_coded_birth = sex == sexbirth,
+    sex_coded_now = sex == sexnow
+  ) |>
+  count(sex, sexbirth, sexnow, sex_changed, sex_mismatch, sex_coded_birth, sex_coded_now) |>
+  mutate(
+  trans_miscoded = sex_changed & !sex_coded_now
+  )
+
+gender_counts |>
+  ggplot(aes(x = as_factor(trans_miscoded), y = n, fill=trans_miscoded)) +
+  geom_bar(stat = "identity") +
+  labs(
+    x = "Respondent-identified gender",
+    y = "Interviewer-coded sex of respondent",
+    fill = "Apparent misgendering?"
+  ) +
+   theme(
+    axis.ticks.x = element_blank(),
+    axis.text.x = element_blank()
+  ) +
+  facet_grid(as_factor(sex) ~ as_factor(sexnow), scales="free_y", labeller = label_wrap_gen(width = 16, multi_line = T))
+
+# gss_clean |> 
+#   filter(!if_any(c(sex, sexbirth, sexnow), is.na)) |>
+#   mutate(
+#     sex_mismatch = 
+#   )
+#   group_by(year) |>
+#   summarize()
+#   ggplot(aes(x = factor(year)))
+```
+```{r}
+gender_counts |>
+  #filter(sexnow %in% c(1, 2)) |>
+  ggplot(aes(x = sex_coded_now, y = n, fill = sex_coded_now)) +
+  geom_bar(stat = "identity", position="dodge") +
+  geom_text(aes(label=n, vjust="center")) +
+  labs(
+    x = "Assigned sex at birth (respondent-identified)",
+    y = "Gender identity (respondent-identified)*",
+    fill = "Reporter-indicated sex matches gender?"
+  ) +
+   theme(
+    axis.ticks.x = element_blank(),
+    axis.text.x = element_blank()
+  ) +
+  #scale_fill_manual(values=c('blue', 'red')) + 
+  facet_grid(as_factor(sexnow) ~ as_factor(sexbirth), scales="free_y", labeller = label_wrap_gen(width = 16, multi_line = T))
 ```
