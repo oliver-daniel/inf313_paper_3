@@ -19,7 +19,7 @@ link-citations: true
 ---
 
 ```{r setup, echo=FALSE}
-knitr::opts_chunk$set(echo = FALSE, out.width = "80%", out.align="center", dir)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, out.width = "80%", out.align="center", dir)
 options(knitr.graphics.error = FALSE)
 ```
 
@@ -36,11 +36,16 @@ data(gss_all)
 gss_clean <- gss_all |>
   mutate(
     id = paste0(year, '_', id),
+    sex = sex,
     sexnow = coalesce(sexnow, sexnow1),
     sexbirth = coalesce(sexbirth, sexbirth1),
     sexsex = sexsex,
     sexsex5 = sexsex5,
-    ornt_sex_label = paste(
+    ptnrornt = ptnrornt,
+    ornt_sex_label = if_else(
+      is.na(sexornt) | is.na(sexnow),
+      as.character(NA),
+      paste(
       case_when(
         sexornt == 1 ~ "Gay",
         sexornt == 2 ~ "Bisexual",
@@ -52,9 +57,10 @@ gss_clean <- gss_all |>
         sexnow == 3 ~ "trans person",
         sexnow == 4 ~ "person of another gender",
       )
-    ),
+    )),
     .keep = "used"
-  )
+  ) |>
+  select(-one_of(c('sexnow1', 'sexbirth1')))
 ```
 
 ```{r functions}
@@ -70,6 +76,7 @@ subsetWith <- function(..., sel=F) {
 
 ## Introduction
 TODO
+
 ## Data
 ### Dataset
 This paper focuses on the United States General Social Survey (US-GSS, or GSS in the the following), a survey regularly administered by the National Opinion Research Center (NORC) at the University of Chicago [@norc-gss]. For reasons elaborated below, although the cumulative data file contains `r nrow(gss_clean) |> format(big.mark=',')` observations across `r gss_clean$year |> n_distinct()` years of study, we will be focusing primarily on only respondents from the last two surveys, in 2018 and 2021. This significantly limits certain aspects of our investigation to `r gss_clean |> filter(year >= 2018) |> nrow() |> format(big.mark =',')` entries; however, the issues we highlight are endemic to the format and methodology of the survey itself, and thus do not require large magnitudes to afford predictive power.
@@ -80,6 +87,8 @@ However, due to the constraints of the COVID-19 pandemic, the 2020 survey – wh
 
 The official GSS Codebook [@gss-codebook] indicates that the variables of the survey consist of a combination of respondent-offered responses (i.e., respondents' answers to a given question) and interviewer-coded responses (i.e., questions that are not directly asked of the respondent, but rather recorded *about* the respondent, at the interviewer's discretion). Again, for something as personal as gender or sexual identity, this necessarily introduces a cognitive gap that is subject to the interviewer's personal perceptions and biases. As a pathological example, a particularly malicious interviewer could knowingly and willingly mis-code a transgender respondent's sex (under the `SEX` variable) as their birth sex, rather than their chosen gender. As a result, we chose to de-emphasize `SEX` — an interviewer-coded variable asked across every ballot of every GSS since 1972 – in our study, in favour of the respondent-focused `SEXNOW` and `SEXNOW1`. These variables are only asked in a single year each – 2018 and 2021, respectively – which *significantly* reduces our pool of respondents. Future studies may be interested in a longitudinal view of how these new, more flexible questions of identity shape responses over time.
 
+Finally, an important note on the usage of `NA` in the dataset: although the Codebook includes marginals for reserved non-response codes – "Don't know", "No answer", "Skipped on web" – the software used to compile the data into an R dataframe [@gssr] condense all of these into the singular value of `NA`.
+
 ### Variables
 Although 2021-specific variables like `SEXNOW1` are necessarily only answered by a small fraction of respondents, they use the same coding as their pre-2021 equivalents, and exist in complementary distribution to them (i.e., no respondent has a response to both variables). As a result, we were able to expand our selection by coalescing the variables together into a single column. This is notated below with a `(1)` suffix, although the 1-suffixed column was dropped in the actual dataframe. With this in mind, our summative list of variables is as follows:
 
@@ -88,24 +97,111 @@ Although 2021-specific variables like `SEXNOW1` are necessarily only answered by
 - `SEXBIRTH(1)`: The assigned sex of the respondent at birth, based on physiognomy. Options: 1 (Male), 2 (Female), 3 (Intersex).
 - `SEXNOW(1)`: The personally-identified sex/gender of the respondent, at survey time. Options: 1 (Male), 2 (Female), 3 (Transgender), 4 (None of these).
 - `SEXORNT`: The sexual[^3] orientation of the respondent. Options: 1 (Gay/Lesbian/Homosexual), 2 (Bisexual), 3 (Straight/Heterosexual).
-- `SEXSEX`: The gender makeup of the respondents' sexual partners, to their knowledge, for the past 12 months. Options: 1 (Exclusively male), 2 (Both male and female), 3 (Exclusively female).
+- `SEXSEX`: The gender makeup of the respondent's sexual partners, to their knowledge, for the past 12 months. Options: 1 (Exclusively male), 2 (Both male and female), 3 (Exclusively female).
 - `SEXSEX5`: Similar to `SEXSEX`, but expanded over the past 5 years. Options: 1 (Exclusively male), 2 (Both male and female), 3 (Exclusively female).
+- `PTNRORNT`: The orientation of the respondent's *latest* sexual partner, to their knowledge. Options: 1 (Gay/Lesbian/Homosexual), 2 (Bisexual), 3 (Straight/Heterosexual), 4 (I have never had a sexual partner)[^4].
 
 ### Computed Variables
 In addition to the above data variables, several additional columns were computed to make the associated data more portable and readable at-a-glance.
 
 - `id`: A serial ID. Not used directly, but it was discovered that the serial IDs for respondents rolledback to 1 every survey year. For reproducibility, it was important to ensure that there were no ID collisions. So, the serial ID is now also prefixed with the year.
-- `sex_ornt_label`: A compact, human-readable description of a person's gender and sexual orientation, as might be used in everyday conversation. e.g., "Straight woman", "Gay man", "Bisexual trans person".[^4]
+- `sex_ornt_label`: A compact, human-readable description of a person's gender and sexual orientation, as might be used in everyday conversation. e.g., "Straight woman", "Gay man", "Bisexual trans person".[^5]
 
 
 ### Methods
-All data analysis[^2] was performed in the R statistical programming language [@R], using RStudio [@RStudio] for ease of exploration, development, and production of this paper via built-in `knitr` [@knitr] functionality. GSS data are fetched by the `gssr` package [@gssr], which automatically packages the columns of the data into a ready-to-use dataframe. As usual, the `tidyverse` [@tidyverse] collection provides an indispensable array of resources, including but not limited to `ggplot2` [@ggplot2] for visualization.
+All data analysis[^2] was performed in the R statistical programming language [@R], using RStudio [@RStudio] for ease of exploration, development, and production of this paper via built-in `knitr` [@knitr] functionality. GSS data are fetched by the `gssr` package [@gssr], which automatically packages the columns of the data into a ready-to-use dataframe. As usual, the `tidyverse` [@tidyverse] collection provides an indispensable array of resources, including but not limited to `ggplot2` [@ggplot2] for visualization. For additional aesthetics, `kableExtra` [@kableExtra], which styles tables, and `patchwork` [@patchwork], which composes multiple `ggplot` plots together, were also used.
 
 
 ## Results
-TODO
+
+```{r fig-demographics}
+subsetWith('year', 'sexnow', 'sexornt', sel = T) |>
+  ggplot(aes(x = as_factor(sexnow), y = after_stat(count), fill = as_factor(sexornt))) +
+  geom_bar() +
+  facet_wrap(~year) +
+  theme(
+    axis.text.x = element_text(angle=20, vjust=.95, hjust=1),
+    legend.position = "bottom"
+  ) +
+  labs(
+    title = "Gender and sexuality identification demographics of GSS respondents across 2018 and 2021 surveys" |> str_wrap(60),
+    x = "Gender identity of respondent",
+    y = "Count",
+    fill = "Sexual orientation of respondent"
+  )
+```
+```{r fig-demographics-trans-nb}
+subsetWith('year', 'sexnow', 'sexornt', sel = T) |>
+  filter(sexnow > 2) |>
+  ggplot(aes(x = as_factor(sexnow), y = after_stat(count), fill = as_factor(sexornt))) +
+  geom_bar() +
+  facet_wrap(~year) +
+  theme(
+    axis.text.x = element_text(angle=20, vjust=.95, hjust=1),
+    legend.position = "bottom"
+  ) +
+  labs(
+    title = "Demographics of transgender and non-binary GSS respondents across 2018 and 2021 surveys" |> str_wrap(60),
+    x = "Gender identity of respondent",
+    y = "Count",
+    fill = "Sexual orientation of respondent"
+  )
+```
+
+```{r table-birth-now}
+
+counts <- 
+  subsetWith('sexbirth', 'sexnow', sel=T) |> 
+  table()
+
+rownames(counts) <- c('Assigned male', 'Assigned female', 'Intersex')
+
+knitr::kable(
+    counts,
+    col.names = c('Male', 'Female', 'Transgender', 'Other'),
+  ) |>
+  kableExtra::kable_classic(full_width = FALSE)
+```
+
+```{r table-sex-coding}
+birth_codes <- c('M', 'F', 'I')
+gender_codes <- c('M', 'F', 'T', 'X')
+
+subsetWith('sexbirth', 'sexnow') |>
+  mutate(
+    code = paste0(birth_codes[sexbirth], gender_codes[sexnow]),
+    ) |>
+  select(code, sex) |>
+  table() |>
+  knitr::kable(col.names = c('Recorded as male', 'Recorded as female')) |>
+  kableExtra::kable_classic(full_width = FALSE)
+```
+
+```{r fig-sexual-partners}
+library(patchwork)
+
+makePlot <- function(y_var) {
+  subsetWith('ornt_sex_label', all_of(y_var), sel=T) |>
+    ggplot(aes(y = reorder(ornt_sex_label, ornt_sex_label, length), fill = as_factor(.data[[all_of(y_var)]]))) +
+    geom_bar(position = position_fill(reverse=TRUE))
+}
+  
+
+makePlot('ptnrornt') + labs(title = '"My latest sexual partner was..."') + theme(legend.position = "bottom", legend.direction = "vertical", axis.title.y = element_blank(), axis.title.x = element_blank(), legend.title = element_blank(), axis.ticks.y = element_blank())
+```
+```{r}
+# ((makePlot('sexsex') + theme(axis.title.y = element_blank())) +
+# (makePlot('sexsex5') + theme(axis.text.y = element_blank(), axis.title.y = element_blank()))) +
+(makePlot('sexsex') + labs(title = "Over the past 12 months")) +
+(makePlot('sexsex5') + labs(title = "Over the past 5 years") + theme(axis.text.y = element_blank())) +
+  plot_layout(guides = "collect") &
+  theme(legend.position = "bottom", axis.title.x = element_blank(), axis.title.y = element_blank(), legend.title = element_blank(), axis.ticks.y = element_blank())
+```
+
+
 ## Discussion
 TODO
+
 ## Survey
 TODO
 
@@ -116,4 +212,5 @@ TODO
 [^1]: Extended.
 [^2]: Code available at https://github.com/oliver-daniel/inf313_paper_3.
 [^3]: There is an important distinction to be made between sexual attraction and romantic attraction, not to mention sexual attraction valency (i.e., the asexuality spectrum). However, for the purposes of this study and supplementary survey, only the prior is considered.
-[^4]: Note that "gay" is used to refer to any kind of exclusively-homosexual attraction, as identified by the respondent. Historically, "gay" often referred exclusively to male homosexual attraction, with "lesbian" being more common for females; conversely, "gay" is currently entering common parlance for *any* same-gender attraction, even among those who also experience different-gender attraction. The usage of terms such as these to refer to different intersections of gender and sexuality over time is fascinating, and worthy of its own study; however, it is immaterial to this study, and so "gay" was chosen as a cover-all term.
+[^4]: This is the only variable under investigation which includes an option for "I have never had a sexual partner". As a result, most analyses involving this variable will explicitly filter out this option, to keep a level playing field among the other sex-partner-related questions.
+[^5]: Note that "gay" is used to refer to any kind of exclusively-homosexual attraction, as identified by the respondent. Historically, "gay" often referred exclusively to male homosexual attraction, with "lesbian" being more common for females; conversely, "gay" is currently entering common parlance for *any* same-gender attraction, even among those who also experience different-gender attraction. The usage of terms such as these to refer to different intersections of gender and sexuality over time is fascinating, and worthy of its own study; however, it is immaterial to this study, and so "gay" was chosen as a cover-all term.
