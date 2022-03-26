@@ -18,8 +18,8 @@ gss_clean <- gss_all |>
     id = paste0(year, '_', id),
     sexnow = coalesce(sexnow, sexnow1),
     sexbirth = coalesce(sexbirth, sexbirth1),
-    ) |>
-  select(id, year, sex, sexnow, sexbirth, sexornt, sexsex, sexsex5)
+    )# |>
+  #select(id, year, sex, sexnow, sexbirth, sexornt, sexsex, sexsex5, ptnrornt)
 ```
 ```{r}
 
@@ -65,14 +65,15 @@ gss_clean |>
 ```
 
 ```{r}
-gss_clean |>
-  filter(!if_any(c(sexsex, sexnow, sexornt), is.na)) |>
+subsetWith(c('sexsex', 'sexnow', 'sexornt')) |>
   ggplot(aes(x = as_factor(sexsex), fill=as_factor(sexsex))) +
   geom_histogram(stat="count") +
   scale_fill_manual(values=c('blue', 'purple', 'red')) +
   theme(axis.text.x = element_blank()) +
-  facet_grid(sexnow ~ sexornt,
-             scales = "free_y")
+  facet_grid(as_factor(sexnow) ~ as_factor(sexornt),
+             scales = "free_y",
+             labeller = label_wrap_gen(width = 16, multi_line = T)
+             )
 ```
 ```{r}
 gss_clean |>
@@ -87,7 +88,7 @@ gss_clean |>
     axis.ticks.x = element_blank(),
     panel.grid.major.x = element_blank()
     ) +
-  facet_grid(sexornt ~ sexnow,
+  facet_grid(as_factor(sexornt) ~ as_factor(sexnow),
              scales = "free_y",
              labeller = label_wrap_gen(width = 16, multi_line = T)
              )
@@ -155,3 +156,94 @@ gender_counts |>
   #scale_fill_manual(values=c('blue', 'red')) + 
   facet_grid(as_factor(sexnow) ~ as_factor(sexbirth), scales="free_y", labeller = label_wrap_gen(width = 16, multi_line = T))
 ```
+
+```{r}
+sex_codes <- c('M', 'F', 'I')
+gender_codes <- c('M', 'F', 'T', 'X')
+
+subsetWith(c('sex', 'sexbirth', 'sexnow')) |>
+  mutate(
+    code = paste0(sex_codes[sexbirth], gender_codes[sexnow])
+    ) |>
+  select(code, sex) |>
+  group_by(code) |>
+  table() |>
+  knitr::kable(col.names = c("Coded male", "Coded female")) |>
+  kableExtra::kable_classic()
+```
+
+```{r}
+subsetWith(c('sexornt', 'ptnrornt')) |>
+  select('sexornt', 'ptnrornt') |>
+  filter(ptnrornt != 4) |> # 'I've never had a sexual partner'
+  group_by(sexornt) |>
+  ggplot(aes(x = as_factor(sexornt), y = as_factor(ptnrornt))) + 
+  geom_bin_2d() +
+  scale_fill_viridis_c(option="C")
+```
+
+```{r}
+subsetWith(c('sexnow', 'sexornt', 'ptnrornt', 'ptnrsxnow')) |>
+  select('sexnow', 'sexornt', 'ptnrornt', 'ptnrsxnow') |>
+  ggplot(aes(x = as_factor(ptnrornt), fill = as_factor(ptnrsxnow))) +
+  geom_histogram(stat='count') +
+  theme_bw() +
+  theme(axis.text.x = element_blank()) +
+  labs(
+    title = "Gender identity of subject",
+    x = "Sexual orientation of last sex partner (Gay, Bisexual, Straight)",
+    y = "Sexual orientation of subject",
+    fill = "Gender identity of last sex partner"
+  ) +
+  facet_grid(as_factor(sexornt) ~ as_factor(sexnow), 
+  scale="free_y",          
+  labeller = label_wrap_gen(width = 16, multi_line = T))
+```
+
+```{r}
+# based on `sex`, how many respondents have primarily been having
+# sexual relationships with an unexpected cohort? (e.g., straight men primarily having sex with men)
+subsetWith('sex', 'sexornt', 'sexsex') |>
+  select(sex, sexornt, sexsex) |>
+  mutate(
+    expected_sexsex = case_when(
+      sex == 1 & sexornt == 3 ~ 3,
+      sex == 1 & sexornt == 1 ~ 1,
+      sex == 2 & sexornt == 3 ~ 1,
+      sex == 2 & sexornt == 1 ~ 3,
+    )
+  ) |>
+  filter(
+    #!is.na(expected_sexsex) &
+    expected_sexsex != sexsex
+  )
+```
+```{r}
+# sim. with sexnow and sexsex5
+subsetWith('sexnow', 'sexornt', 'sexsex5') |>
+  select(year, sexnow, sexornt, sexsex5) |>
+  rowwise() |>
+  mutate(
+    label = paste(
+      c("Gay", "Bisexual", "Straight")[sexornt],
+      c("men", "women", "transgender people", "people of other genders")[sexnow],
+      "primarily having sex with",
+      c("men", "women", "both men and women")[sexsex5]
+    , collapse = " "),
+    expected_sexsex = case_when(
+      sexnow == 1 & sexornt == 3 ~ 3,
+      sexnow == 1 & sexornt == 1 ~ 1,
+      sexnow == 2 & sexornt == 3 ~ 1,
+      sexnow == 2 & sexornt == 1 ~ 3,
+    )
+  ) |>
+  count(label)
+
+# |>
+#   filter(
+#     #!is.na(expected_sexsex) &
+#     sexsex != expected_sexsex
+#   )
+```
+
+
