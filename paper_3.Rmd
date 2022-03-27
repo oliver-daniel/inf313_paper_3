@@ -24,7 +24,7 @@ bibliography: in/references.bib
 link-citations: true
 ---
 
-```{r preamble}
+```{r preamble, echo = FALSE}
 #### Preamble ####
 # Purpose: Fetch, clean, and present data from the NORC United States General Social Survey, knitted into a research paper
 # Authors: Oliver Daniel and Tiago Martins
@@ -46,10 +46,13 @@ options(knitr.graphics.error = FALSE)
 ```{r libraries, include=FALSE}
 if (!require(tidyverse)) {install.packages('tidyverse')}
 if (!require(gssr)) {remotes::install_github('https://github.com/kjhealy/gssr')}
+if (!require(knitr)) {remotes::install_github('yihui/knitr')}
 if (!require(kableExtra)) {install.packages('kableExtra')}
 if (!require(patchwork)) {install.packages('patchwork')}
+if (!require(ggalluvial)) {install.packages('ggalluvial')}
 
 library(tidyverse)
+library(ggalluvial)
 library(kableExtra)
 library(patchwork)
 library(gssr)
@@ -57,6 +60,10 @@ library(gssr)
 
 ```{r data-setup}
 data(gss_all)
+
+lvls <- expand.grid(x = c("Gay", "Bisexual", "Straight"), y = c("men", "women", "trans people", "people of other genders")) |> arrange(y)
+ordered_levels <- do.call(paste, lvls)
+
 gss_clean <- gss_all |>
   mutate(
     id = paste0(year, '_', id),
@@ -66,22 +73,21 @@ gss_clean <- gss_all |>
     sexsex = sexsex,
     sexsex5 = sexsex5,
     ptnrornt = ptnrornt,
+    ptnrsxnow = ptnrsxnow,
     ornt_sex_label = if_else(
       is.na(sexornt) | is.na(sexnow),
       as.character(NA),
       paste(
-      case_when(
-        sexornt == 1 ~ "Gay",
-        sexornt == 2 ~ "Bisexual",
-        sexornt == 3 ~ "Straight"
-      ),
-      case_when(
-        sexnow == 1 ~ "men",
-        sexnow == 2 ~ "women",
-        sexnow == 3 ~ "trans people",
-        sexnow == 4 ~ "people of other genders",
-      )
-    )),
+        levels(lvls[,1])[sexornt],
+        levels(lvls[,2])[sexnow]
+    )) |> factor(levels = ordered_levels),
+    ptnr_label = if_else(
+      is.na(ptnrornt) | is.na(ptnrsxnow),
+      as.character(NA),
+      paste(
+        levels(lvls[,1])[ptnrornt],
+        levels(lvls[,2])[ptnrsxnow]
+      )) |> factor(levels = ordered_levels),
     .keep = "used"
   ) |>
   select(-one_of(c('sexnow1', 'sexbirth1')))
@@ -140,12 +146,14 @@ Although 2021-specific variables like `SEXNOW1` are necessarily only answered by
 - `SEXSEX`: The gender makeup of the respondent's sexual partners, to their knowledge, for the past 12 months. Options: 1 (Exclusively male), 2 (Both male and female), 3 (Exclusively female).
 - `SEXSEX5`: Similar to `SEXSEX`, but expanded over the past 5 years. Options: 1 (Exclusively male), 2 (Both male and female), 3 (Exclusively female).
 - `PTNRORNT`: The orientation of the respondent's *latest* sexual partner, to their knowledge. Options: 1 (Gay/Lesbian/Homosexual), 2 (Bisexual), 3 (Straight/Heterosexual), 4 (I have never had a sexual partner)[^4].
+- `PTNRSXNOW`: The gender identity of the respondent's *latest* sexual partner, to their knowledge. Options: 1 (Male), 2 (Female), 3 (Transgender), 4 (None of these).
 
 ### Computed Variables
 In addition to the above data variables, several additional columns were computed to make the associated data more portable and readable at-a-glance.
 
 - `id`: A serial ID. Not used directly, but it was discovered that the serial IDs for respondents rolledback to 1 every survey year. For reproducibility, it was important to ensure that there were no ID collisions. So, the serial ID is now also prefixed with the year.
-- `sex_ornt_label`: A compact, human-readable description of a person's gender and sexual orientation, as might be used in everyday conversation. e.g., "Straight woman", "Gay man", "Bisexual trans person".[^5]
+- `sex_ornt_label`: A compact, human-readable description of a respondent's gender and sexual orientation, as might be used in everyday conversation. e.g., "Straight woman", "Gay man", "Bisexual trans person".[^5]
+- `ptnr_label`: Similar, for respondents' latest sexual partner.
 
 
 ### Methods
@@ -154,6 +162,8 @@ All data analysis[^2] was performed in the R statistical programming language [@
 
 ## Results
 
+### Respondent demographics
+We first sought to develop an understanding of the demography of our respondents. In Figure \@ref(fig:demographics) below, we see that respondents to the 2018 and 2021 GSS overwhelmingly self-identify as men and women (as opposed to transgendered or another gender), and predominantly as heterosexual. Interestingly, although the bisexual-identifying segment of the 2018 female respondent pool is so small as to be almost invisible, a significantly greater magnitude and proportion of them are present in the 2021 pool. The same trend is visible in the population of gay men, albeit to a lesser extent.
 
 ```{r fig-demographics, fig.cap="\\label{fig:demographics} In both 2018 and 2021, respondent demographics are dominated by straight men and women. A significantly larger contingent of bisexual women responded in 2021."}
 subsetWith('year', 'sexnow', 'sexornt', sel = T) |>
@@ -173,6 +183,8 @@ subsetWith('year', 'sexnow', 'sexornt', sel = T) |>
   ) +
   scale_fill_manual(values=c(colour$gay, colour$bisexual, colour$straight))
 ```
+Figure \@ref(fig:demographics-trans-nb) zooms in on the non-binary gender options which, although representing an extremely small portion of the population – with no cohort representing more than ten respondents in a given year – exhibits a greater diversity in sexuality than their binary counterparts.
+
 ```{r fig-demographics-trans-nb, fig.cap="\\label{fig:demographics-trans-nb} The overall turnout of transgender and 'other' (e.g., non-binary) respondents is low, but exhibits a wider diversity in sexuality."}
 subsetWith('year', 'sexnow', 'sexornt', sel = T) |>
   filter(sexnow > 2) |>
@@ -191,6 +203,7 @@ subsetWith('year', 'sexnow', 'sexornt', sel = T) |>
   ) +
   scale_fill_manual(values=c(colour$gay, colour$bisexual, colour$straight))
 ```
+With access to not only respondents' present gender identity, but also their birth sex, we were interested to determine the distinction, if any, between those respondents who responded 'transgender' as opposed to a binary gender. Table \@ref(tab:table-birth-now) contrasts birth sex (rows) with gender identity (columns) and counts total respondents at each intersection. As expected, the majority of respondents identify as cisgendered: that is, that their present gender corresponds to their birth sex. As many male-assigned respondents identified as female (i.e., as trans women) as transgender, implying that there is not a clear semantic delineation between the two. And, with the presence of a fourth 'other' category – which includes two male-assigned respondents – it is not necessarily the case that 'transgender' also includes non-binary and gender-non-conforming identities. This linguistic distinction is a clear area for future study. Fascinatingly, despite making up an estimated [TODO: amount, cite] of the U.S. population, only one respondent intimated that they were born intersex. As a result, and lacking access to this individual's actual interview/questionnaire, we will focus less on the complicated realm of post-intersex gender identity, especially as it corresponds to post-natal gender reassignment by medical practitioners; this, too, is a viable subject of intense study. [TODO CITE?]
 
 ```{r table-birth-now}
 
@@ -206,7 +219,11 @@ knitr::kable(
     caption = "As expected, cisgendered respondents vastly outnumber any other configuration; in this dataset, the entire intersex population of the United States is represented by a single respondent."
   )
 ```
-More than 22% of self-reported cisgender women are recorded as male, and 30% of self-reported cisgender men as female.
+
+### Interviewer gender coding and the `SEX` variable
+
+As mentioned previously, early explorations of the data necessitated disregarding the `SEX` variable almost entirely. This is perhaps most strikingly exhibited below in Table \@ref(tab:table-sex-coding); for brevity, the first column delineates the birth sex (M = male; F = female; I = intersex) and the gender identification (M = male; F = female; T = transgender; X = other) with a slash.
+
 ```{r table-sex-coding}
 birth_codes <- c('M', 'F', 'I')
 gender_codes <- c('M', 'F', 'T', 'X')
@@ -225,11 +242,50 @@ colnames(counts) <- c('Recorded as male', 'Recorded as female')
     caption="This table exhibits the first major inconsistency in the data."
     )
 ```
+As shown, more than 22% of self-reported cisgender women are recorded by interviewers as male, and 30% of self-reported cisgender men as female. Without further access to the specific methodologies of conducting a US-GSS interview, it is unknown to us what could have caused such a significant anomaly. The Codebook [@gss-codebook] notes:
+
+> The variable SEX was revised for the web mode as well. In face-to-face interviews, interviewers traditionally coded
+SEX based on interviewer observation. In the web mode, SEX was asked explicitly of respondents. Sex and gender
+identity are collected as two separate items: sex recorded at birth (SEXBIRTH1) and current gender identity
+(SEXNOW1). In the past, these items have only been asked to two-thirds of respondents (i.e., two ballots), on a
+self-administered topical module. Beginning with the 2020/2021 GSS (both the 2016-2020 GSS Panel Wave 2 and
+the 2021 GSS Cross-section), SEXBIRTH1 and SEXNOW1 are asked of all respondents. For the purpose of
+backward compatibility, the cross-section dataset contains SEX, which uses the traditional binary coding scheme,
+and is based on recoding both SEXBIRTH1 and SEXNOW1 in 2021 (which was collected by interviewer observation
+in prior years).
+
+It is not at all clear what is meant by 'recoding', in terms of how the `SEX` column is calculated from the aforementioned respondent-identified columns, especially when this calculation produced more than one-fifths' error in what should have been the two most straightforward cases. It furthermore reflects poorly on the NORC that in each non-cisgendered combination, at least half of respondents are coded as their birth sex, even when their chosen gender is explicitly different. For example, 100% of female-assigned respondents who identified as an unlisted gender were recorded as female, as were 50% of male-assigned, female respondents. Although we hesitate to draw from this a malicious reading, this inconsistency in gender-recording procedure, across multiple intersections of sex and gender, is certainly cause for suspicion.
+
+### Sexual orientation and recent sex partners
+Tables \@ref(fig:partner-correlation)-\@ref(fig:sexual-partners-over-time) investigate the gender and sexuality makeup of respondents' recent sexual partners. The spans in question range from only the latest engagement, to a five-year period.
+
+Figure \@ref(fig:partner-correlation) below provides a bird's-eye view of respondents' most recent sexual activity. Although a single sexual partner does not necessarily exemplify *all* of a respondent's partners over time, the recency of the data hopefully mitigates the risk of one's historical sexual behaviour being irreflective of their present orientation, especially in a Western heteronormative environment. This means, for example, that a person may have had several partners of the opposite sex before realizing that they were gay or otherwise interested in the same sex. As a result, their latest partner is likely – though by no means certain – to be someone to whose gender and sexuality the respondent is attracted.
+
+```{r fig-partner-correlation, fig.cap="\\label{fig:partner-correlation}Including a log scale was necessary to compete with the overwhelmingly frequent pairings of straight men and straight women."}
+subsetWith('ornt_sex_label', 'ptnr_label', sel = T) |>
+  select(ornt_sex_label, ptnr_label) |>
+  ggplot(aes(x = ptnr_label, y = ornt_sex_label, fill = log(after_stat(count)))) +
+  scale_x_discrete(limits=ordered_levels) +
+  geom_bin2d() +
+  coord_fixed() +
+  scale_fill_viridis_c(option="C") +
+  labs(
+    title = str_wrap("Log-scale correlation heatmap of respondent's identity to that of their latest sexual partner", width = 60),
+    y = "Identity of respondent",
+    x = '"To my knowledge, my last sexual partner was..."',
+    fill = "frequency\n(log scale)"
+  ) +
+  theme(axis.text.x = element_text(angle = 45,hjust=1))
+```
+Many high-frequency pairings are expected: straight men with straight women, gay men with gay men, and so on. Bisexual woman respondents in particular exhibit a wider variety in their partners than any other cohort of respondents, including some in which the partners' fields of attraction appear to mismatch. In one case, for example, a respondent who identified as a bisexual woman responded that their latest partner was a straight woman. In real life, such sexual pairings absolutely happen [TODO CITE? maybe some queer theory?] Similarly, a number of sexual encounters were recorded between straight men and straight men (`r gss_clean |> filter(ornt_sex_label == "Straight men" & ptnr_label == "Straight men") |> nrow()`), and straight women with straight women (`r gss_clean |> filter(ornt_sex_label == "Straight wo" & ptnr_label == "Straight women") |> nrow()`). Surprisingly, transgender and non-binary (i.e., 'other') respondents exclusively reported binary-gendered partners. However, it must be acknowledged that, as such a narrow slice of the respondent pool, this absence could be by sheer chance.
+
+Narrowing our focus to the sexuality (or existence) of the respondent's latest partner appears to confirm this: although binary-gendered respondents show at least some diversity in the proportions of their partners' sexualities, each row in Figure \@ref(fig:latest-sexual-partners) below corresponding to a transgender or nonbinary cohort exhibits either 100% or 50% consensus, indicating very low magnitudes.
+
 
 ```{r fig-latest-sexual-partners, fig.cap="\\label{fig:latest-sexual-partners}Surprisingly, the distributions of this variable seem to be more accurately reflective than those in Figure \\ref{fig:sexual-partners-over-time}, in terms of what sorts of sexual partners one would expect a respondent to have had."}
 makePlot <- function(y_var) {
   subsetWith('ornt_sex_label', all_of(y_var), sel=T) |>
-    ggplot(aes(y = reorder(ornt_sex_label, ornt_sex_label, length), fill = as_factor(.data[[all_of(y_var)]]))) +
+    ggplot(aes(y = ornt_sex_label, fill = as_factor(.data[[all_of(y_var)]]))) +
     geom_bar(position = position_fill(reverse=TRUE))
 }
   
@@ -239,6 +295,7 @@ makePlot('ptnrornt') + theme(legend.position = "bottom", legend.direction = "ver
   subtitle = "by personal identity, as a proportion of respondents"
 ) + scale_fill_manual(values=c(colour$gay, colour$bisexual, colour$straight, colour$none))
 ```
+However, we run into another surprising anomaly when analyzing variables `SEXSEX` and `SEXSEX5`, which concern longitudinal sexual behaviour over 1- and 5-year periods, respectively. As might be expected, the 5-year results are usually slightly more diverse than their shorter-term counterparts; bisexual respondents, in particular, responded 'Both male and female' more frequently over the expanded timeframe. The sexual partners of straight men, on the other hand, appear hardly to change at all, save for a slightly-widened sliver of 'Both male and female' responses. That being said, one would imagine that these partners would be exclusively women – or that this would be the case for most straight men. Instead, almost 30% of straight male respondents report having had sex exclusively with men. Similarly, nearly a third of straight women report having sex only with women in the past year, a proportion that increases to full half when considering the past 5 years. Again, although we do not suppose to claim such a result is *impossible*, a 22-year-long observational study into the behaviour of straight people (Daniel et al, 2022)[^7] appears to indicate this is at the least an *improbable* result. Instead, we propose that this is another notational error, similar to the miscoding of cisgendered respondents discussed above.
 
 ```{r fig-sexual-partners-over-time, fig.cap="\\label{fig:sexual-partners-over-time}Although preference in sexual partners appears relatively stable over both 1-year and 5-year periods, an anomalously large contingent of heterosexual-identifying men and women have had exclusively same-sex relationships over these periods."}
 (makePlot('sexsex') + labs(title = "over the past 12 months")) +
@@ -248,6 +305,24 @@ makePlot('ptnrornt') + theme(legend.position = "bottom", legend.direction = "ver
   subtitle = "by personal identity, as a proportion of respondents") &
   theme(legend.position = "bottom", axis.title.x = element_blank(), axis.title.y = element_blank(), legend.title = element_blank(), axis.ticks.y = element_blank()) &
   scale_fill_manual(values=c(colour$male, colour$bisexual, colour$female))
+```
+
+```{r}
+subsetWith('sex', 'sexnow', 'sexornt', 'sexsex', 'ornt_sex_label', sel=T) |>
+  filter(sex <= 2 & sexornt != 2) |>
+  mutate(
+    sex_miscoded = sex != sexnow,
+    unexpected_partner = case_when(
+      sex == 1 & sexornt == 3 ~ sexsex != 3,
+      sex == 1 & sexornt == 1 ~ sexsex != 1,
+      sex == 2 & sexornt == 3 ~ sexsex != 1,
+      sex == 2 & sexornt == 1 ~ sexsex != 1,
+      TRUE ~ as.logical(NA)
+    )
+  ) |> 
+  #filter(sex_miscoded | unexpected_par)
+  group_by(ornt_sex_label, sex_miscoded, unexpected_partner) |>
+  count()
 ```
 
 
@@ -267,3 +342,4 @@ TODO
 [^4]: This is the only variable under investigation which includes an option for "I have never had a sexual partner". As a result, most analyses involving this variable will explicitly filter out this option, to keep a level playing field among the other sex-partner-related questions.
 [^5]: Note that "gay" is used to refer to any kind of exclusively-homosexual attraction, as identified by the respondent. Historically, "gay" often referred exclusively to male homosexual attraction, with "lesbian" being more common for females; conversely, "gay" is currently entering common parlance for *any* same-gender attraction, even among those who also experience different-gender attraction. The usage of terms such as these to refer to different intersections of gender and sexuality over time is fascinating, and worthy of its own study; however, it is immaterial to this study, and so "gay" was chosen as a cover-all term.
 [^6]: Attempts to, anyway. Half of the options cause Kable to dump raw \LaTeX  and destroy the formatting of the entire document. Did you know that it's literally impossible to move table captions to the bottom of the table?
+[^7]: Not cited; paper does not exist.
