@@ -6,6 +6,12 @@ abstract: >
 author: "Oliver Daniel & Tiago Martins"
 date: "due March 20, 2022[^1]"
 geometry: "margin=1.5in"
+output:
+  bookdown::pdf_document2:
+    toc: true
+    number_sections: false
+    fig_crop: false
+    extra_dependencies: ["flafter"]
 knit: (function(input, ...) {
     rmarkdown::render(
     input,
@@ -18,6 +24,20 @@ bibliography: in/references.bib
 link-citations: true
 ---
 
+```{r preamble}
+#### Preamble ####
+# Purpose: Fetch, clean, and present data from the NORC United States General Social Survey, knitted into a research paper
+# Authors: Oliver Daniel and Tiago Martins
+# Date: 2022-03-20
+# Contact: via Quercus or email
+# License: WTFPL
+# Prerequisites:
+# - None known; running this file should auto-install
+# dependencies.
+
+#TODO: move setup to another script?
+```
+
 ```{r setup, echo=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, out.width = "80%", out.align="center", dir)
 options(knitr.graphics.error = FALSE)
@@ -26,8 +46,12 @@ options(knitr.graphics.error = FALSE)
 ```{r libraries, include=FALSE}
 if (!require(tidyverse)) {install.packages('tidyverse')}
 if (!require(gssr)) {remotes::install_github('https://github.com/kjhealy/gssr')}
+if (!require(kableExtra)) {install.packages('kableExtra')}
+if (!require(patchwork)) {install.packages('patchwork')}
 
 library(tidyverse)
+library(kableExtra)
+library(patchwork)
 library(gssr)
 ```
 
@@ -52,10 +76,10 @@ gss_clean <- gss_all |>
         sexornt == 3 ~ "Straight"
       ),
       case_when(
-        sexnow == 1 ~ "man",
-        sexnow == 2 ~ "woman",
-        sexnow == 3 ~ "trans person",
-        sexnow == 4 ~ "person of another gender",
+        sexnow == 1 ~ "men",
+        sexnow == 2 ~ "women",
+        sexnow == 3 ~ "trans people",
+        sexnow == 4 ~ "people of other genders",
       )
     )),
     .keep = "used"
@@ -73,6 +97,22 @@ subsetWith <- function(..., sel=F) {
   result
 }
 ```
+
+```{r colours}
+colour <- list(
+  male = '#0273f5',
+  intersex = '#9B02ED',
+  female = '#fb0036',
+  trans = '#F495D1',
+  other = '#098000',
+  gay = '#A50314',
+  bisexual = '#B759D9',
+  straight = '#0375A6',
+  none = '#464646'
+)
+
+```
+
 
 ## Introduction
 TODO
@@ -109,28 +149,31 @@ In addition to the above data variables, several additional columns were compute
 
 
 ### Methods
-All data analysis[^2] was performed in the R statistical programming language [@R], using RStudio [@RStudio] for ease of exploration, development, and production of this paper via built-in `knitr` [@knitr] functionality. GSS data are fetched by the `gssr` package [@gssr], which automatically packages the columns of the data into a ready-to-use dataframe. As usual, the `tidyverse` [@tidyverse] collection provides an indispensable array of resources, including but not limited to `ggplot2` [@ggplot2] for visualization. For additional aesthetics, `kableExtra` [@kableExtra], which styles tables, and `patchwork` [@patchwork], which composes multiple `ggplot` plots together, were also used.
+All data analysis[^2] was performed in the R statistical programming language [@R], using RStudio [@RStudio] for ease of exploration, development, and production of this paper via built-in `knitr` [@knitr] functionality. GSS data are fetched by the `gssr` package [@gssr], which automatically packages the columns of the data into a ready-to-use dataframe. As usual, the `tidyverse` [@tidyverse] collection provides an indispensable array of resources, including but not limited to `ggplot2` [@ggplot2] for visualization. For additional aesthetics, `kableExtra` [@kableExtra], which[^6] styles tables, and `patchwork` [@patchwork], which composes multiple `ggplot` plots together, were also used.
 
 
 ## Results
 
-```{r fig-demographics}
+
+```{r fig-demographics, fig.cap="\\label{fig:demographics} In both 2018 and 2021, respondent demographics are dominated by straight men and women. A significantly larger contingent of bisexual women responded in 2021."}
 subsetWith('year', 'sexnow', 'sexornt', sel = T) |>
   ggplot(aes(x = as_factor(sexnow), y = after_stat(count), fill = as_factor(sexornt))) +
   geom_bar() +
   facet_wrap(~year) +
   theme(
     axis.text.x = element_text(angle=20, vjust=.95, hjust=1),
-    legend.position = "bottom"
+    axis.title.y = element_blank(),
+    legend.position = "bottom",
+    legend.direction = "vertical"
   ) +
   labs(
     title = "Gender and sexuality identification demographics of GSS respondents across 2018 and 2021 surveys" |> str_wrap(60),
     x = "Gender identity of respondent",
-    y = "Count",
     fill = "Sexual orientation of respondent"
-  )
+  ) +
+  scale_fill_manual(values=c(colour$gay, colour$bisexual, colour$straight))
 ```
-```{r fig-demographics-trans-nb}
+```{r fig-demographics-trans-nb, fig.cap="\\label{fig:demographics-trans-nb} The overall turnout of transgender and 'other' (e.g., non-binary) respondents is low, but exhibits a wider diversity in sexuality."}
 subsetWith('year', 'sexnow', 'sexornt', sel = T) |>
   filter(sexnow > 2) |>
   ggplot(aes(x = as_factor(sexnow), y = after_stat(count), fill = as_factor(sexornt))) +
@@ -138,14 +181,15 @@ subsetWith('year', 'sexnow', 'sexornt', sel = T) |>
   facet_wrap(~year) +
   theme(
     axis.text.x = element_text(angle=20, vjust=.95, hjust=1),
+    axis.title.y = element_blank(),
     legend.position = "bottom"
   ) +
   labs(
-    title = "Demographics of transgender and non-binary GSS respondents across 2018 and 2021 surveys" |> str_wrap(60),
+    title = "Demographics of transgender and 'other' GSS respondents across 2018 and 2021 surveys" |> str_wrap(60),
     x = "Gender identity of respondent",
-    y = "Count",
     fill = "Sexual orientation of respondent"
-  )
+  ) +
+  scale_fill_manual(values=c(colour$gay, colour$bisexual, colour$straight))
 ```
 
 ```{r table-birth-now}
@@ -159,27 +203,30 @@ rownames(counts) <- c('Assigned male', 'Assigned female', 'Intersex')
 knitr::kable(
     counts,
     col.names = c('Male', 'Female', 'Transgender', 'Other'),
-  ) |>
-  kableExtra::kable_classic(full_width = FALSE)
+    caption = "As expected, cisgendered respondents vastly outnumber any other configuration; in this dataset, the entire intersex population of the United States is represented by a single respondent."
+  )
 ```
-
+More than 22% of self-reported cisgender women are recorded as male, and 30% of self-reported cisgender men as female.
 ```{r table-sex-coding}
 birth_codes <- c('M', 'F', 'I')
 gender_codes <- c('M', 'F', 'T', 'X')
 
-subsetWith('sexbirth', 'sexnow') |>
+counts <- subsetWith('sexbirth', 'sexnow') |>
   mutate(
-    code = paste0(birth_codes[sexbirth], gender_codes[sexnow]),
+    code = paste0(birth_codes[sexbirth], '/', gender_codes[sexnow]),
     ) |>
   select(code, sex) |>
-  table() |>
-  knitr::kable(col.names = c('Recorded as male', 'Recorded as female')) |>
-  kableExtra::kable_classic(full_width = FALSE)
+  table()
+
+colnames(counts) <- c('Recorded as male', 'Recorded as female')
+
+  knitr::kable(
+    counts,
+    caption="This table exhibits the first major inconsistency in the data."
+    )
 ```
 
-```{r fig-sexual-partners}
-library(patchwork)
-
+```{r fig-latest-sexual-partners, fig.cap="\\label{fig:latest-sexual-partners}Surprisingly, the distributions of this variable seem to be more accurately reflective than those in Figure \\ref{fig:sexual-partners-over-time}, in terms of what sorts of sexual partners one would expect a respondent to have had."}
 makePlot <- function(y_var) {
   subsetWith('ornt_sex_label', all_of(y_var), sel=T) |>
     ggplot(aes(y = reorder(ornt_sex_label, ornt_sex_label, length), fill = as_factor(.data[[all_of(y_var)]]))) +
@@ -187,15 +234,20 @@ makePlot <- function(y_var) {
 }
   
 
-makePlot('ptnrornt') + labs(title = '"My latest sexual partner was..."') + theme(legend.position = "bottom", legend.direction = "vertical", axis.title.y = element_blank(), axis.title.x = element_blank(), legend.title = element_blank(), axis.ticks.y = element_blank())
+makePlot('ptnrornt') + theme(legend.position = "bottom", legend.direction = "vertical", axis.title.y = element_blank(), axis.title.x = element_blank(), legend.title = element_blank(), legend.justification = "left", axis.ticks.y = element_blank()) + plot_annotation(
+  title = '"In terms of their orientation, my latest sexual partner was..."',
+  subtitle = "by personal identity, as a proportion of respondents"
+) + scale_fill_manual(values=c(colour$gay, colour$bisexual, colour$straight, colour$none))
 ```
-```{r}
-# ((makePlot('sexsex') + theme(axis.title.y = element_blank())) +
-# (makePlot('sexsex5') + theme(axis.text.y = element_blank(), axis.title.y = element_blank()))) +
-(makePlot('sexsex') + labs(title = "Over the past 12 months")) +
-(makePlot('sexsex5') + labs(title = "Over the past 5 years") + theme(axis.text.y = element_blank())) +
-  plot_layout(guides = "collect") &
-  theme(legend.position = "bottom", axis.title.x = element_blank(), axis.title.y = element_blank(), legend.title = element_blank(), axis.ticks.y = element_blank())
+
+```{r fig-sexual-partners-over-time, fig.cap="\\label{fig:sexual-partners-over-time}Although preference in sexual partners appears relatively stable over both 1-year and 5-year periods, an anomalously large contingent of heterosexual-identifying men and women have had exclusively same-sex relationships over these periods."}
+(makePlot('sexsex') + labs(title = "over the past 12 months")) +
+(makePlot('sexsex5') + labs(title = "over the past 5 years") + theme(axis.text.y = element_blank())) +
+  plot_layout(guides = "collect")  +
+  plot_annotation(title = '"In terms of their sex, my sexual partners have been..."',
+  subtitle = "by personal identity, as a proportion of respondents") &
+  theme(legend.position = "bottom", axis.title.x = element_blank(), axis.title.y = element_blank(), legend.title = element_blank(), axis.ticks.y = element_blank()) &
+  scale_fill_manual(values=c(colour$male, colour$bisexual, colour$female))
 ```
 
 
@@ -214,3 +266,4 @@ TODO
 [^3]: There is an important distinction to be made between sexual attraction and romantic attraction, not to mention sexual attraction valency (i.e., the asexuality spectrum). However, for the purposes of this study and supplementary survey, only the prior is considered.
 [^4]: This is the only variable under investigation which includes an option for "I have never had a sexual partner". As a result, most analyses involving this variable will explicitly filter out this option, to keep a level playing field among the other sex-partner-related questions.
 [^5]: Note that "gay" is used to refer to any kind of exclusively-homosexual attraction, as identified by the respondent. Historically, "gay" often referred exclusively to male homosexual attraction, with "lesbian" being more common for females; conversely, "gay" is currently entering common parlance for *any* same-gender attraction, even among those who also experience different-gender attraction. The usage of terms such as these to refer to different intersections of gender and sexuality over time is fascinating, and worthy of its own study; however, it is immaterial to this study, and so "gay" was chosen as a cover-all term.
+[^6]: Attempts to, anyway. Half of the options cause Kable to dump raw \LaTeX  and destroy the formatting of the entire document. Did you know that it's literally impossible to move table captions to the bottom of the table?
