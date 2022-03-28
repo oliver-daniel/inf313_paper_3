@@ -49,10 +49,8 @@ if (!require(gssr)) {remotes::install_github('https://github.com/kjhealy/gssr')}
 if (!require(knitr)) {remotes::install_github('yihui/knitr')}
 if (!require(kableExtra)) {install.packages('kableExtra')}
 if (!require(patchwork)) {install.packages('patchwork')}
-if (!require(ggalluvial)) {install.packages('ggalluvial')}
 
 library(tidyverse)
-library(ggalluvial)
 library(kableExtra)
 library(patchwork)
 library(gssr)
@@ -277,7 +275,7 @@ subsetWith('ornt_sex_label', 'ptnr_label', sel = T) |>
   ) +
   theme(axis.text.x = element_text(angle = 45,hjust=1))
 ```
-Many high-frequency pairings are expected: straight men with straight women, gay men with gay men, and so on. Bisexual woman respondents in particular exhibit a wider variety in their partners than any other cohort of respondents, including some in which the partners' fields of attraction appear to mismatch. In one case, for example, a respondent who identified as a bisexual woman responded that their latest partner was a straight woman. In real life, such sexual pairings absolutely happen [TODO CITE? maybe some queer theory?] Similarly, a number of sexual encounters were recorded between straight men and straight men (`r gss_clean |> filter(ornt_sex_label == "Straight men" & ptnr_label == "Straight men") |> nrow()`), and straight women with straight women (`r gss_clean |> filter(ornt_sex_label == "Straight wo" & ptnr_label == "Straight women") |> nrow()`). Surprisingly, transgender and non-binary (i.e., 'other') respondents exclusively reported binary-gendered partners. However, it must be acknowledged that, as such a narrow slice of the respondent pool, this absence could be by sheer chance.
+Many high-frequency pairings are expected: straight men with straight women, gay men with gay men, and so on. Bisexual woman respondents in particular exhibit a wider variety in their partners than any other cohort of respondents, including some in which the partners' fields of attraction appear to mismatch. In one case, for example, a respondent who identified as a bisexual woman responded that their latest partner was a straight woman. In real life, such sexual pairings absolutely happen [TODO CITE? maybe some queer theory?] Similarly, a number of sexual encounters were recorded between straight men and straight men (`r gss_clean |> filter(ornt_sex_label == "Straight men" & ptnr_label == "Straight men") |> nrow()`), and straight women with straight women (`r gss_clean |> filter(ornt_sex_label == "Straight women" & ptnr_label == "Straight women") |> nrow()`). Surprisingly, transgender and non-binary (i.e., 'other') respondents exclusively reported binary-gendered partners. However, it must be acknowledged that, as such a narrow slice of the respondent pool, this absence could be by sheer chance.
 
 Narrowing our focus to the sexuality (or existence) of the respondent's latest partner appears to confirm this: although binary-gendered respondents show at least some diversity in the proportions of their partners' sexualities, each row in Figure \@ref(fig:latest-sexual-partners) below corresponding to a transgender or nonbinary cohort exhibits either 100% or 50% consensus, indicating very low magnitudes.
 
@@ -306,31 +304,43 @@ However, we run into another surprising anomaly when analyzing variables `SEXSEX
   theme(legend.position = "bottom", axis.title.x = element_blank(), axis.title.y = element_blank(), legend.title = element_blank(), axis.ticks.y = element_blank()) &
   scale_fill_manual(values=c(colour$male, colour$bisexual, colour$female))
 ```
+Table \@ref(tab:table-miscodings-unexpected) investigates this anomaly further, specifically as it pertains to binary-gendered respondents with a single-sex attraction, e.g., respondents who identify as male or female, and gay or straight. In summary, it appears that having one's gender misrecorded in `SEX` but having had sexual partners exclusively of the expected sex, or vice versa, is significantly less likely than both variables being either expected or unexpected in value. To illustrate this confusing wording with an example, there are significantly more self-identified gay men who:
 
-```{r}
-subsetWith('sex', 'sexnow', 'sexornt', 'sexsex', 'ornt_sex_label', sel=T) |>
-  filter(sex <= 2 & sexornt != 2) |>
+- a) were recorded as *men* and b) reported having sex with *only men* in the past year; or
+- a) were recorded as *women* and b) reported having sex with *only women* in the past year
+
+than some combination of the two. Mysteriously, gay women – the least abundant of the cohorts – reverse this trend, being the only cohort with any respondents who were misrecorded as men, but only having reported sex with women, and zero respondents to be accurately recorded as women with only female partners. This appears to be evidence of a comparatively widespread scrambling of responses when compared to personal identification, which may well have interfered with other findings in this paper. It is unknown at this time whether this confusion stems from survey respondents themselves, the interviewers who recorded their responses, at some point in the NORC datafiles, or even in the `gssr` client (@gssr) we are using to fetch and process the data.
+
+```{r table-miscodings-unexpected}
+
+subsetWith('sex', 'sexnow', 'sexornt', 'ornt_sex_label', 'sexsex', sel=F) |>
+filter(sexnow <= 2 & sexornt %in% c(1, 3)) |>
   mutate(
     sex_miscoded = sex != sexnow,
     unexpected_partner = case_when(
-      sex == 1 & sexornt == 3 ~ sexsex != 3,
-      sex == 1 & sexornt == 1 ~ sexsex != 1,
-      sex == 2 & sexornt == 3 ~ sexsex != 1,
-      sex == 2 & sexornt == 1 ~ sexsex != 1,
-      TRUE ~ as.logical(NA)
+      ornt_sex_label == "Straight men" ~ sexsex != 3,
+      ornt_sex_label == "Gay men" ~ sexsex != 1,
+      ornt_sex_label == "Straight women" ~ sexsex != 1,
+      ornt_sex_label == "Gay women" ~ sexsex != 1,
+      TRUE ~ FALSE
     )
-  ) |> 
-  #filter(sex_miscoded | unexpected_par)
-  group_by(ornt_sex_label, sex_miscoded, unexpected_partner) |>
-  count()
+  ) |>
+  count(ornt_sex_label, sex_miscoded, unexpected_partner) |>
+  pivot_wider(names_from = c(sex_miscoded, unexpected_partner), values_from = n, values_fill = 0) |>
+  relocate(TRUE_TRUE, .after = FALSE_TRUE) |>
+  kable(col.names = c('Identity', 'No/No', 'No/Yes', 'Yes/Yes', 'Yes/No'),
+        caption = "There appears to be a correlative effect between a mismatch in recorded sex, and the likelihood of sexual experiences beyond the expected demographic. Apart from that, there seems to be a confounding effect afoot."
+        ) |>
+  kable_classic() |>
+  add_header_above(header = c(" " = 1, "Sex miscoded?/Unexpected partner?" = 4))
 ```
 
 
 ## Discussion
 TODO
 
-## Survey
-TODO
+## Appendix: Survey
+Our survey can be found online [here](https://forms.gle/AsAQ8nudjoSHc6sz9).
 
 \newpage
 ## References
