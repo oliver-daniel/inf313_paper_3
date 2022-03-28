@@ -34,12 +34,10 @@ link-citations: true
 # Prerequisites:
 # - None known; running this file should auto-install
 # dependencies.
-
-#TODO: move setup to another script?
 ```
 
 ```{r setup, echo=FALSE}
-knitr::opts_chunk$set(echo = FALSE, warning = FALSE, out.width = "80%", out.align="center", dir)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, out.width = "100%", out.align="center", dir)
 options(knitr.graphics.error = FALSE)
 ```
 
@@ -119,7 +117,12 @@ colour <- list(
 
 
 ## Introduction
-TODO
+The General Social Survey, also known as the General Social Surveys, is a series of interviews conducted by the National Opinion Research Center at the University of Chicago [@gssr]. These surveys are cross-sectional, meaning that they analyze data across a population at a specific point in time. The General Social Survey, henceforth referred to as GSS, covers a variety of subject matter, including topics relating to sex, gender identity, and sexual partners. It is these variables that are the subject matter of this paper.
+
+Utilizing the programming language R [@R], the integrated development environment RStudio [@RStudio], and several associated packages, we have drawn from the 2019 GSS data set and constructed several graphs to visualize trends in the areas of sex and gender. In doing so, we found several issues with the structuring of survey questions, the most egregious being a lack of gender expression and identity response options, particularly with regards to transgender individuals. We discuss the effects this has, while also noting the effects of the COVID-19 pandemic on this iteration of the GSS.
+
+Lastly, as part of our analysis of the shortcomings in the 2019 GSS, we provide examples of similar data collection methods that offered potential solutions to these issues. While they are from two different fields, New Zealand’s Statistical Standard for Gender Identity [@Northland], and the Centers for Disease Control and Prevention’s Behavioural Risk Factor Surveillance System [@Healthcare], both offer more nuanced options for interviewee gender identity responses. In the appdendix, we include a survey of our creation which, if adopted by the NORC, would be of benefit to future GSS studies.
+
 
 ## Data
 ### Dataset
@@ -201,7 +204,7 @@ subsetWith('year', 'sexnow', 'sexornt', sel = T) |>
   ) +
   scale_fill_manual(values=c(colour$gay, colour$bisexual, colour$straight))
 ```
-With access to not only respondents' present gender identity, but also their birth sex, we were interested to determine the distinction, if any, between those respondents who responded 'transgender' as opposed to a binary gender. Table \@ref(tab:table-birth-now) contrasts birth sex (rows) with gender identity (columns) and counts total respondents at each intersection. As expected, the majority of respondents identify as cisgendered: that is, that their present gender corresponds to their birth sex. As many male-assigned respondents identified as female (i.e., as trans women) as transgender, implying that there is not a clear semantic delineation between the two. And, with the presence of a fourth 'other' category – which includes two male-assigned respondents – it is not necessarily the case that 'transgender' also includes non-binary and gender-non-conforming identities. This linguistic distinction is a clear area for future study. Fascinatingly, despite making up an estimated [TODO: amount, cite] of the U.S. population, only one respondent intimated that they were born intersex. As a result, and lacking access to this individual's actual interview/questionnaire, we will focus less on the complicated realm of post-intersex gender identity, especially as it corresponds to post-natal gender reassignment by medical practitioners; this, too, is a viable subject of intense study. [TODO CITE?]
+With access to not only respondents' present gender identity, but also their birth sex, we were interested to determine the distinction, if any, between those respondents who responded 'transgender' as opposed to a binary gender. Table \@ref(tab:table-birth-now) contrasts birth sex (rows) with gender identity (columns) and counts total respondents at each intersection. As expected, the majority of respondents identify as cisgendered: that is, that their present gender corresponds to their birth sex. As many male-assigned respondents identified as female (i.e., as trans women) as transgender, implying that there is not a clear semantic delineation between the two. And, with the presence of a fourth 'other' category – which includes two male-assigned respondents – it is not necessarily the case that 'transgender' also includes non-binary and gender-non-conforming identities. This linguistic distinction is a clear area for future study. Likewise, only one respondent intimated that they were born intersex; as a result, and lacking access to this individual's actual interview/questionnaire, we will focus less on the complicated realm of post-intersex gender identity, especially as it corresponds to post-natal gender reassignment by medical practitioners; this, as @Northland outlines, is a viable subject of intense study.
 
 ```{r table-birth-now}
 
@@ -275,7 +278,7 @@ subsetWith('ornt_sex_label', 'ptnr_label', sel = T) |>
   ) +
   theme(axis.text.x = element_text(angle = 45,hjust=1))
 ```
-Many high-frequency pairings are expected: straight men with straight women, gay men with gay men, and so on. Bisexual woman respondents in particular exhibit a wider variety in their partners than any other cohort of respondents, including some in which the partners' fields of attraction appear to mismatch. In one case, for example, a respondent who identified as a bisexual woman responded that their latest partner was a straight woman. In real life, such sexual pairings absolutely happen [TODO CITE? maybe some queer theory?] Similarly, a number of sexual encounters were recorded between straight men and straight men (`r gss_clean |> filter(ornt_sex_label == "Straight men" & ptnr_label == "Straight men") |> nrow()`), and straight women with straight women (`r gss_clean |> filter(ornt_sex_label == "Straight women" & ptnr_label == "Straight women") |> nrow()`). Surprisingly, transgender and non-binary (i.e., 'other') respondents exclusively reported binary-gendered partners. However, it must be acknowledged that, as such a narrow slice of the respondent pool, this absence could be by sheer chance.
+Many high-frequency pairings are expected: straight men with straight women, gay men with gay men, and so on. Bisexual woman respondents in particular exhibit a wider variety in their partners than any other cohort of respondents, including some in which the partners' fields of attraction appear to mismatch. In one case, for example, a respondent who identified as a bisexual woman responded that their latest partner was a straight woman. In real life, such sexual pairings absolutely happen [@NotGay], but are less common than these data would indicate. Similarly, a number of sexual encounters were recorded between straight men and straight men (`r gss_clean |> filter(ornt_sex_label == "Straight men" & ptnr_label == "Straight men") |> nrow()`), and straight women with straight women (`r gss_clean |> filter(ornt_sex_label == "Straight women" & ptnr_label == "Straight women") |> nrow()`). Surprisingly, transgender and non-binary (i.e., 'other') respondents exclusively reported binary-gendered partners. However, it must be acknowledged that, as such a narrow slice of the respondent pool, this absence could be by sheer chance.
 
 Narrowing our focus to the sexuality (or existence) of the respondent's latest partner appears to confirm this: although binary-gendered respondents show at least some diversity in the proportions of their partners' sexualities, each row in Figure \@ref(fig:latest-sexual-partners) below corresponding to a transgender or nonbinary cohort exhibits either 100% or 50% consensus, indicating very low magnitudes.
 
@@ -309,7 +312,7 @@ Table \@ref(tab:table-miscodings-unexpected) investigates this anomaly further, 
 - a) were recorded as *men* and b) reported having sex with *only men* in the past year; or
 - a) were recorded as *women* and b) reported having sex with *only women* in the past year
 
-than some combination of the two. Mysteriously, gay women – the least abundant of the cohorts – reverse this trend, being the only cohort with any respondents who were misrecorded as men, but only having reported sex with women, and zero respondents to be accurately recorded as women with only female partners. This appears to be evidence of a comparatively widespread scrambling of responses when compared to personal identification, which may well have interfered with other findings in this paper. It is unknown at this time whether this confusion stems from survey respondents themselves, the interviewers who recorded their responses, at some point in the NORC datafiles, or even in the `gssr` client (@gssr) we are using to fetch and process the data.
+than some combination of the two. Mysteriously, gay women – the least abundant of the cohorts – reverse this trend, being the only cohort with any respondents who were misrecorded as men, but only having reported sex with women, and zero respondents to be accurately recorded as women with only female partners. This appears to be evidence of a comparatively widespread scrambling of responses when compared to personal identification, which may well have interfered with other findings in this paper. It is unknown at this time whether this confusion stems from survey respondents themselves, the interviewers who recorded their responses, at some point in the NORC datafiles, or even in the `gssr` client [@gssr] we are using to fetch and process the data.
 
 ```{r table-miscodings-unexpected}
 
@@ -337,10 +340,83 @@ filter(sexnow <= 2 & sexornt %in% c(1, 3)) |>
 
 
 ## Discussion
-TODO
+While unlikely that this was the intention of the GSS creators, one cannot help but see effects of inadequate response options in a survey intended to be nationally representative. As previously mentioned, the options for gender self-identification in the 2019 GSS comprised of merely four categories: male, female, transgender, and other [@norc-gss]. As there exists within the data individuals of particular birth sexes identifying as members of the opposite sex, as part of their gender identity, one questions the applicability of the transgender identity option at all. And as always, there is the ever-present risk that the transferring from a live interview to a self-administered digital survey may have greatly altered participant responses due to the shift in medium.
+
+It should be known that, in the collection of data on gender and sexuality, the articulation of the meaning of categories is important. Sullivan [@Conflate] gives the example of the misconception of using the terms ‘sex’ and ‘gender’ synonymously, thereby crippling the sources of data used for the studying of various social issues. One such issue is the existence of son preference within certain countries, and with it, the risk of sex-targeted abortions. Without the knowledge of an individual’s birth sex, how are we continue to study and combat issues that target specific birth sexes? Sullivan’s work offers a critique of the conflation between these terms, something the GSS has thus far avoided.
+
+However, in a continuation of the discussion regarding gender identity options, we can look to other examples of surveys which offer different perspectives on the collection of this data. The Government of New Zealand’s Statistical Standard for Gender Identity, an overhauled version of the previous Statistical Standard for Sex, outlines the parameters for which data regarding gender identity is to be gathered. This statistical standard seeks to facilitate the standardization of term definitions and the measurements of gender identity [@Northland] so that continually developing human rights requirements are met. The Standard defines gender identity as: “an individual’s internal sense of being wholly female, wholly male, or having aspects of female and male” [@Northland]. Its identity options are also novel compared to the GSS, offering the options of: male, female, and gender diverse, which has the participant fill in the most appropriate terminology for themselves. While there are indeed criticisms of this approach, the fact that it is this legislature that is the first ever national statistical standard for gender identity, shows that there are still new avenues open for other nations to be more representative.
+
+Another example of a different approach to gathering information on gender identities is the Behavioural Risk Factor Surveillance System, abbreviated as BRFSS, which are cross-sectional, population-based health surveys overseen by the Centers for Disease Control and Prevention [@Healthcare]. The BRFSS as a whole is composed of several modules, one of them being dedicated to gender identity and sexuality. This particular module is made up of two questions: one addressing gender identity, and one addressing sexual orientation. The question of interest to this paper is that of gender identity, which the BRFSS deliberately asks: “Do you identify as transgender?” If answered yes, the participant then has the options of male-to-female, female-to-male, or gender nonconforming [@Healthcare]. Here we see the BRFSS having the same initial options as the GSS, but with an additional layer afterwards. With this additional set of options, the GSS would likely receive much more detailed data on participant’s identities.
+
+While unfortunately impacted by the COVID-19 pandemic, the 2019 GSS maintains a degree of inclusivity when gathering data on gender identity and sexuality. These efforts can be improved upon, we believe, with the application of strategies used by the New Zealand Standard and the BRFSS, which are articulate definitions and a greater variety of options, respectively.
+
+
+\newpage
 
 ## Appendix: Survey
-Our survey can be found online [here (link)](https://forms.gle/AsAQ8nudjoSHc6sz9).
+Our survey can be found online here: [https://forms.gle/AsAQ8nudjoSHc6sz9 (link)](https://forms.gle/AsAQ8nudjoSHc6sz9).
+
+What follows is a text-based copy of the survey.
+
+---
+
+### Self-identification of sexuality and gender: the terminology of labels and their use
+
+The National Opinion Research Center (NORC) at the University of Chicago has selected you for a supplementary survey, in order to better understand the evolution of the identification and labelling of sexuality (i.e., sexual orientation) and gender in the United States.
+
+By completing this survey, you agree that the NORC may use your responses, stripped of any and all personally-identifying information, in analysis, present and future, in the forum or fora of their choosing. The results of this survey will be stored indefinitely in a secure online server, and will be made available to the public via downloadable datasheets. This survey is voluntary; there is no penalty for declining to participate, withdrawing from participation before submitting (even if you've already started responded), or not answering any question (not marked as required).
+
+Furthermore, this survey focuses entirely on the verbiage of self-identity in gender and sexuality, not on any physical aspect thereto. You will not be asked any personal medical, physiological, or anatomical questions.
+
+#### Introduction and demographics
+
+##### A note on the language of this survey:
+
+For the purposes of this survey, we define a few common terms as follows. Note that these are not end-all definitions, but merely notational for the purpose of communicating questions.
+
+- A "man" refers to any person who identifies as male or masculine.
+- A "woman" refers to any person who identifies as female or masculine.
+- A "non-binary" person refers to any person who identifies as neither male nor female, irrespective of the specific term they may use to this end (agender, gender non-conforming, gender-fluid, etc.)
+- "Cisgender(ed)" refers to a person whose current gender identity corresponds to that which was assigned to them at birth, usually based on physiological traits. E.g., a cisgender woman is a woman who was assigned female at birth, and continues to identify as female.
+- "Transgender(ed)" refers to a person whose current gender identity does NOT correspond to their assigned gender at birth. E.g., a transgender woman is a woman who was NOT assigned female at birth, but consciously underwent/is undergoing a process of social transition into a woman. The gender in question need not be one of the male-female binary; under this definition, non-binary people ARE considered to be transgender.
+- "Attracted to" refers to the experience of experiencing sexual attraction to the relevant party, and is usually assumed to be primary/exclusive unless otherwise stated. E.g., someone who is "attracted to men" is primarily/exclusively attracted to people who identify as men. Note that we specify sexual attraction; romantic attraction will be the focus of future study.
+- "Bisexual" refers to ANY sexual orientation that affords attraction to more than one gender. That is, a bisexual person may e.g., experience attraction to different genders differently or disprefer a particular gender, but they are still capable of experiencing attraction to these genders.
+
+##### Questions
+1. Please describe your gender identity, in whatever terms you use the most frequently.
+2. Has your gender identity ever been different from this identity, for any period of time?
+3. Would you describe yourself as cisgender?
+4. If you answered "No" to the above, do you describe yourself first by your gender identity (man, woman, etc.), or as transgender?
+5. Please enter your preferred NOMINATIVE pronouns, i.e., what would be used to refer to you in the third person. If you use more than one set of pronouns, feel free to include them with slashes.
+6. Please describe your sexual orientation, in whatever terms you use most frequently.
+
+### Opinions and views on the language of identification
+For the following questions, please rate how much you agree with the statement, on a scale of "Strongly agree" to "Strongly disagree".
+
+For questions that ask you about the definitions of words, base your response on how you understand the term and how you use it. Disregard, e.g., how other people around you use the term: imagine that you could instantly make everyone use and understand the term the exact same way you do.
+
+##### Questions, contd.
+7. There is sufficient, commonly-understood language to accurately describe my gender and sexuality.
+8. I find the current state of self-identifying language (pronouns, sexuality terms, etc.) confusing.
+9. The word "gay" only refers to gay men, i.e., men who are exclusively sexually attracted to men.
+10. Men who are attracted to men and non-binary people, but not women, are gay.
+11. Straight (i.e., exclusively heterosexual) people can be attracted to non-binary people.
+12. Gay (i.e., exclusively homosexual) people can be attracted to non-binary people.
+13. Women can be gay.
+14. The word "lesbian" only refers to women who are exclusively attracted to women.
+15. Lesbians can be attracted to non-binary people.
+16. A relationship between a transgender person of a binary gender (i.e., male or female), and someone of the opposite binary gender, is straight.
+17. "Bisexual" means attraction to men and women.
+18. "Bisexual" includes attraction to non-binary people and other genders.
+19. A relationship between a bisexual and someone of the same gender is gay.
+20. A relationship between a bisexual and someone of a different gender (e.g., a bisexual man and a woman, regardless of her orientation) is gay.
+21. A relationship between two bisexuals is gay, regardless of the genders of the two involved.
+22. "Bisexual" and "pansexual" mean similar, but ultimately different, things.
+23. Non-binary people are necessarily transgender.
+24. Non-binary people are not cisgender and not transgender, but something different entirely.
+25. Non-binary people can be straight.
+26. Non-binary people can be gay.
+27. A relationship involving a non-binary person is necessarily not a straight relationship.
 
 \newpage
 ## References
