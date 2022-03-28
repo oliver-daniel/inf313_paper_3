@@ -1,3 +1,12 @@
+#### Preamble ####
+# Purpose: Exploratory scripts and views into the 2018 and 2021 USS-GSS results.
+# Authors: Oliver Daniel and Tiago Martins
+# Date: 2022-03-20
+# Contact: via Quercus or email
+# License: WTFPL
+# Prerequisites:
+# - Tidyverse
+
 ```{r}
 library(gssr)
 library(tidyverse)
